@@ -1,0 +1,33 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    color-scheme: light;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply bg-brand-mist font-sans text-slate-900 antialiased;
+    margin: 0;
+    min-width: 320px;
+  }
+
+  * {
+    box-sizing: border-box;
+  }
+
+  ::selection {
+    @apply bg-emerald-200 text-brand-slate;
+  }
+}
+
+@layer components {
+  .text-balance {
+    text-wrap: balance;
+  }
+}

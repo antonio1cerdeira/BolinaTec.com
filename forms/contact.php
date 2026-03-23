@@ -1,68 +1,93 @@
 <?php
-  /**
-  * Requires the "PHP Email Form" library
-  * The "PHP Email Form" library is available only in the pro version of the template
-  * The library should be uploaded to: vendor/php-email-form/php-email-form.php
-  * For more info and help: https://bootstrapmade.com/php-email-form/
-  */
+declare(strict_types=1);
 
-  // Substitua com o seu email real
-  $receiving_email_address = 'no-reply@bolinatec.com';  // Use seu email real
+header('Content-Type: application/json; charset=utf-8');
 
-  // Carregar a biblioteca PHP Email Form
-  if( file_exists($php_email_form = '../assets/vendor/php-email-form/php-email-form.php' )) {
-    include( $php_email_form );
-  } else {
-    die( 'Unable to load the "PHP Email Form" Library!');
-  }
+function respond(int $statusCode, string $message): never
+{
+    http_response_code($statusCode);
+    echo json_encode(['message' => $message], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    exit;
+}
 
-  // Sanitização e validação dos dados do formulário
-  $name = htmlspecialchars($_POST['name'] ?? '', ENT_QUOTES, 'UTF-8');
-  $email = htmlspecialchars($_POST['email'] ?? '', ENT_QUOTES, 'UTF-8');
-  $subject = htmlspecialchars($_POST['subject'] ?? '', ENT_QUOTES, 'UTF-8');
-  $message = htmlspecialchars($_POST['message'] ?? '', ENT_QUOTES, 'UTF-8');
+function clean_header_value(string $value): string
+{
+    return trim(str_replace(["\r", "\n"], '', $value));
+}
 
-  // Validação de campos obrigatórios
-  if (empty($name) || empty($email) || empty($subject) || empty($message)) {
-    die('Todos os campos são obrigatórios.');
-  }
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+    respond(405, 'Método não permitido.');
+}
 
-  // Validação do formato de email
-  if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
-      die('Email inválido.');
-  }
+$honeypot = trim((string) ($_POST['website'] ?? ''));
+if ($honeypot !== '') {
+    respond(400, 'Pedido inválido.');
+}
 
-  // Verificação do reCAPTCHA
-  $recaptcha_secret = '6LdcAP0qAAAAAN33bT1AFW-0VbKXpJiHjsp4b5Bo';
-  $recaptcha_response = $_POST['g-recaptcha-response'] ?? '';
-  
-  if (!$recaptcha_response) {
-    die('Erro: reCAPTCHA não foi preenchido.');
-  }
+$name = trim((string) ($_POST['name'] ?? ''));
+$email = trim((string) ($_POST['email'] ?? ''));
+$company = trim((string) ($_POST['company'] ?? ''));
+$interest = trim((string) ($_POST['interest'] ?? ''));
+$subject = trim((string) ($_POST['subject'] ?? 'Novo contacto via site'));
+$message = trim((string) ($_POST['message'] ?? ''));
 
-  $verify_response = file_get_contents('https://www.google.com/recaptcha/api/siteverify?secret='.$recaptcha_secret.'&response='.$recaptcha_response);
-  $response_keys = json_decode($verify_response, true);
-  
-  if(empty($response_keys["success"]) || !$response_keys["success"]) {
-    die('Erro de verificação do CAPTCHA. Tente novamente.');
-  }
+if ($name === '' || $email === '' || $message === '') {
+    respond(422, 'Nome, email e mensagem são obrigatórios.');
+}
 
-  // Criar o objeto de envio de email
-  $contact = new PHP_Email_Form;
-  $contact->ajax = true;
-  $contact->to = $receiving_email_address;
-  $contact->from_name = $name;
-  $contact->from_email = $email;
-  $contact->subject = $subject;
+if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+    respond(422, 'O email indicado não é válido.');
+}
 
-  $contact->add_message($name, 'Nome');
-  $contact->add_message($email, 'Email');
-  $contact->add_message($message, 'Mensagem', 10);
+$safeName = clean_header_value($name);
+$safeEmail = clean_header_value($email);
+$safeSubject = clean_header_value($subject);
 
-  // Envio do formulário e resposta ao usuário
-  if ($contact->send()) {
-    echo 'Obrigado por entrar em contato! Sua mensagem foi enviada com sucesso.';
-  } else {
-    echo 'Ocorreu um erro ao enviar sua mensagem. Tente novamente mais tarde.';
-  }
-?>
+$receivingEmailAddress = 'no-reply@bolinatec.com';
+$mailSubject = 'Bolina Tec | ' . ($safeSubject !== '' ? $safeSubject : 'Novo contacto via site');
+
+$bodyLines = [
+    'Novo contacto recebido pelo site da Bolina Tec.',
+    '',
+    'Nome: ' . $name,
+    'Email: ' . $email,
+    'Empresa/Organização: ' . ($company !== '' ? $company : 'Não indicada'),
+    'Tema principal: ' . ($interest !== '' ? $interest : 'Não indicado'),
+    '',
+    'Mensagem:',
+    $message,
+    '',
+    'Data UTC: ' . gmdate('c'),
+];
+
+$body = implode(PHP_EOL, $bodyLines);
+
+$headers = [
+    'MIME-Version: 1.0',
+    'Content-Type: text/plain; charset=UTF-8',
+    'From: Bolina Tec Website <' . $receivingEmailAddress . '>',
+    'Reply-To: ' . $safeName . ' <' . $safeEmail . '>',
+    'X-Mailer: PHP/' . PHP_VERSION,
+];
+
+$mailSent = false;
+
+if (function_exists('mail')) {
+    $mailSent = @mail($receivingEmailAddress, $mailSubject, $body, implode("\r\n", $headers));
+}
+
+if (!$mailSent) {
+    $logEntry = implode(PHP_EOL, [
+        str_repeat('-', 72),
+        $body,
+        '',
+    ]);
+
+    $logResult = @file_put_contents(__DIR__ . '/contact-submissions.log', $logEntry, FILE_APPEND | LOCK_EX);
+
+    if ($logResult === false) {
+        respond(500, 'Não foi possível processar a submissão neste momento.');
+    }
+}
+
+respond(200, 'Mensagem enviada com sucesso. A equipa da Bolina Tec entrará em contacto em breve.');
