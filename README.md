@@ -249,10 +249,6 @@ Neste caso, o frontend pode continuar a usar `forms/contact.php` como endpoint l
 
 Projeto desenvolvido para a **Bolina Tec**.
 
-**Creditos frontend / design / implementacao:** Rodrigo Henriques
-
-Se quiseres, esta linha tambem pode ser adaptada depois para:
-
 ```text
 Website desenvolvido por Rodrigo Henriques para a Bolina Tec.
 ```
