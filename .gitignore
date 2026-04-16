@@ -1,3 +1,6 @@
 node_modules/
 dist/
 forms/contact-submissions.log
+.env
+.env.*
+!.env.example

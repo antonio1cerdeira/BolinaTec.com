@@ -53,10 +53,7 @@ export default function App() {
           <ConsultingSection />
         </Suspense>
         <Suspense fallback={<SectionSkeleton tone="light" />}>
-          <SolutionsSection
-            activeProject={activeProject}
-            onProjectSelect={setActiveProject}
-          />
+          <SolutionsSection />
         </Suspense>
         <Suspense fallback={<SectionSkeleton tone="dark" />}>
           <HeliTubeSection

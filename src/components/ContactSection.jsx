@@ -48,10 +48,15 @@ export default function ContactSection() {
   const [errors, setErrors] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [status, setStatus] = useState({ type: 'idle', message: '' });
+  const web3FormsAccessKey = import.meta.env.VITE_WEB3FORMS_ACCESS_KEY;
+  const useWeb3Forms = Boolean(web3FormsAccessKey);
 
   const endpoint = useMemo(
-    () => import.meta.env.VITE_CONTACT_ENDPOINT || `${import.meta.env.BASE_URL}forms/contact.php`,
-    [],
+    () =>
+      useWeb3Forms
+        ? 'https://api.web3forms.com/submit'
+        : import.meta.env.VITE_CONTACT_ENDPOINT || `${import.meta.env.BASE_URL}forms/contact.php`,
+    [useWeb3Forms],
   );
 
   const handleChange = (event) => {
@@ -118,17 +123,38 @@ export default function ContactSection() {
     formPayload.append('website', formData.website);
 
     try {
-      const response = await fetch(endpoint, {
-        method: 'POST',
-        body: formPayload,
-      });
+      const response = await fetch(
+        endpoint,
+        useWeb3Forms
+          ? {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                Accept: 'application/json',
+              },
+              body: JSON.stringify({
+                access_key: web3FormsAccessKey,
+                name: formData.name,
+                email: formData.email,
+                company: formData.company,
+                subject: 'Novo contacto via website Bolina Tec',
+                message: `${formData.message}\n\nEmpresa/Organizacao: ${formData.company || 'Nao indicada'}`,
+                from_name: 'Website Bolina Tec',
+                botcheck: formData.website,
+              }),
+            }
+          : {
+              method: 'POST',
+              body: formPayload,
+            },
+      );
 
       const contentType = response.headers.get('content-type') || '';
       const data = contentType.includes('application/json')
         ? await response.json()
         : { message: await response.text() };
 
-      if (!response.ok) {
+      if (!response.ok || (useWeb3Forms && data.success === false)) {
         throw new Error(data.message || 'Nao foi possivel enviar a mensagem.');
       }
 
